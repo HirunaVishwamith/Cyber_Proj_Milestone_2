@@ -294,5 +294,5 @@ def verify_hash_endpoint():
     except Exception as e:
        return jsonify({"error":"An unexpected error occurred: "+str(e)}),500
 
-if __name__ == '__main__':
-    app.run(debug=True)  # Use debug=True for development only 
+# if __name__ == '__main__':
+#     app.run(debug=True)  # Use debug=True for development only 
