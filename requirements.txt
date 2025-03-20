@@ -1,2 +1,5 @@
 Flask
+request
+jsonify
+cryptography
 Gunicorn 
