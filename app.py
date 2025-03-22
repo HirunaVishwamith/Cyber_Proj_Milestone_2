@@ -8,20 +8,19 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
 from cryptography.hazmat.backends import default_backend
+import hashlib
 
 app = Flask(__name__)
 
 keys = {}
 users = {}
-
+password="****" # would import this as a environmet secret in production; hardcoded for demo purposes only
 def generate_aes_key(key_size):
-    """Generates a random AES key."""
     if key_size not in (128, 192, 256):
         raise ValueError("Invalid AES key size. Must be 128, 192, or 256.")
     return os.urandom(key_size // 8)
 
 def generate_rsa_key_pair(key_size):
-    """Generates an RSA key pair."""
     private_key = rsa.generate_private_key(
         public_exponent=65537,
         key_size=key_size,
@@ -30,74 +29,61 @@ def generate_rsa_key_pair(key_size):
     public_key = private_key.public_key()
     return private_key, public_key
 
-def serialize_rsa_private_key(private_key):
-    """Serializes an RSA private key to PEM format."""
+def serialize_rsa_private_key(private_key, password):
     pem = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption()  # No password for simplicity
+        encryption_algorithm=serialization.BestAvailableEncryption(password.encode('utf-8'))
     )
     return pem
 
 def serialize_rsa_public_key(public_key):
-     """Serializes an RSA public key to PEM format"""
-     pem = public_key.public_bytes(
+    pem = public_key.public_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PublicFormat.SubjectPublicKeyInfo
-     )
-     return pem
+    )
+    return pem
 
-def deserialize_rsa_private_key(pem_data):
-    """Deserializes an RSA private key from PEM format."""
+def deserialize_rsa_private_key(pem_data, password):
     private_key = serialization.load_pem_private_key(
         pem_data,
-        password=None,  # No password used during serialization
+        password=password.encode('utf-8') if password else None,
         backend=default_backend()
     )
     return private_key
-    
+
 def deserialize_rsa_public_key(pem_data):
-    """Deserializes an RSA public key from PEM format"""
     public_key = serialization.load_pem_public_key(
        pem_data,
        backend=default_backend()
     )
     return public_key
 
-
 def aes_encrypt(key, plaintext):
-    """Encrypts plaintext using AES-CBC with PKCS7 padding."""
-    iv = os.urandom(16)  # Generate a random IV for CBC mode
+    iv = os.urandom(16)
     cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
     encryptor = cipher.encryptor()
 
-    # PKCS7 Padding
     padder = padding.PKCS7(algorithms.AES.block_size).padder()
     padded_data = padder.update(plaintext.encode('utf-8')) + padder.finalize()
 
     ciphertext = encryptor.update(padded_data) + encryptor.finalize()
-    return base64.b64encode(iv + ciphertext).decode('utf-8')  # added IV for decryption
-
+    return base64.b64encode(iv + ciphertext).decode('utf-8')
 
 def aes_decrypt(key, ciphertext):
-    """Decrypts AES-CBC ciphertext with PKCS7 padding."""
     ciphertext_bytes = base64.b64decode(ciphertext)
-    iv = ciphertext_bytes[:16]  # Extract the IV
+    iv = ciphertext_bytes[:16]
     ciphertext_no_iv = ciphertext_bytes[16:]
 
     cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
     decryptor = cipher.decryptor()
     padded_data = decryptor.update(ciphertext_no_iv) + decryptor.finalize()
 
-    # PKCS7 Unpadding
     unpadder = padding.PKCS7(algorithms.AES.block_size).unpadder()
     plaintext = unpadder.update(padded_data) + unpadder.finalize()
     return plaintext.decode('utf-8')
 
-
-
 def rsa_encrypt(public_key, plaintext):
-    """Encrypts plaintext using RSA with OAEP padding."""
     ciphertext = public_key.encrypt(
         plaintext.encode('utf-8'),
         asym_padding.OAEP(
@@ -109,7 +95,6 @@ def rsa_encrypt(public_key, plaintext):
     return base64.b64encode(ciphertext).decode('utf-8')
 
 def rsa_decrypt(private_key, ciphertext):
-    """Decrypts RSA ciphertext with OAEP padding."""
     ciphertext_bytes = base64.b64decode(ciphertext)
     plaintext = private_key.decrypt(
         ciphertext_bytes,
@@ -154,8 +139,6 @@ def verify_hash(data, hash_value, algorithm):
         return False, str(e)  # Handle unsupported algorithms during verification
     except Exception:
         return False, "An error occurred during hash verification"
-
-
 #---------password chain-------------
 def hash_function(data):
     """Returns a SHA-256 hash of the input data."""
@@ -168,8 +151,6 @@ def generate_hash_chain(password, n):
         hashes.append(hash_function(hashes[-1]))
     print(hashes[-1])
     return hashes[::-1]  # Reverse to maintain order
-#-------------------------------------
-
 
 @app.route('/generate-key', methods=['POST'])
 def generate_key():
@@ -193,7 +174,7 @@ def generate_key():
 
         elif key_type.upper() == 'RSA':
              private_key, public_key = generate_rsa_key_pair(key_size)
-             private_pem = serialize_rsa_private_key(private_key)
+             private_pem = serialize_rsa_private_key(private_key,password)
              public_pem = serialize_rsa_public_key(public_key)
              keys[key_id] = {'private_key': private_pem, 'public_key': public_pem,  'type': 'RSA'}
              #Return only publick key to user
@@ -209,7 +190,7 @@ def generate_key():
     except Exception as e:
         return jsonify({'error': 'An unexpected error occurred: ' + str(e)}), 500
 
-
+#-------------------------------------
 @app.route('/encrypt', methods=['POST'])
 def encrypt():
     """Encrypts a message."""
@@ -261,7 +242,7 @@ def decrypt():
         if algorithm.upper() == 'AES' and key_data['type'] == 'AES':
             plaintext = aes_decrypt(key_data['key'], ciphertext)
         elif algorithm.upper() == 'RSA' and key_data['type'] == 'RSA':
-            private_key = deserialize_rsa_private_key(key_data.get('private_key'))
+            private_key = deserialize_rsa_private_key(key_data.get('private_key'),password)
             plaintext = rsa_decrypt(private_key, ciphertext)
         else:
             return jsonify({'error': 'Invalid algorithm or key type mismatch'}), 400

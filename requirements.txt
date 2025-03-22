@@ -2,4 +2,5 @@ Flask
 requests
 jsonify
 cryptography
-Gunicorn 
+Gunicorn
+hashlib 
