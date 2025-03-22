@@ -108,10 +108,12 @@
 
         async function generateHash() {
             const data = document.getElementById("hash-data").value;
+            const algorithm = document.getElementById("hash-algorithm").value;
+            
             await testAPI(
                 'generate-hash', 
                 'POST', 
-                { data: data, algorithm: 'SHA-256' }, 
+                { data: data, algorithm: algorithm }, 
                 "hashRequest", "hashValue"
             );
         }
@@ -119,17 +121,22 @@
         async function verifyHash() {
             const data = document.getElementById("hash-data").value;
             const hashValue = document.getElementById("hash-value").value;
+            const algorithm = document.getElementById("hash-algorithm").value;
+            
             await testAPI(
                 'verify-hash', 
                 'POST', 
-                { data: data, hash_value: hashValue, algorithm: 'SHA-256' }, 
+                { data: data, hash_value: hashValue, algorithm: algorithm }, 
                 "hashVerifyRequest", "hashVerification"
             );
         }
     </script>
 </head>
 <body>
-    <h1>Cryptographic API Interactive Documentation - Team CyberBoys</h1>
+    <h1>Crpyptographic API Interactive Documentation - Team CyberBoys</h1>
+    <div class="container">
+        <h3> These are some interactive exmples for basic functionalities refer for the report for the full functionality and documentation</h4>
+    </div>
     <div class="container">
 
         <!-- Encryption Section -->
@@ -154,17 +161,17 @@
             <input type="text" id="plaintext" placeholder="Enter text here">
             <button onclick="handleEncryption()">Generate Key & Encrypt</button>
 
-            <h3>Sample Key Generation Request - POST /generate-key</h3>
+            <h3>Sample Key Generation Request</h3>
             <pre id="keyRequest"></pre>
             <h3>Generated Key</h3>
             <pre id="generatedKey"></pre>
 
-            <h3>Sample Encryption Request - POST /encrypt</h3>
+            <h3>Sample Encryption Request</h3>
             <pre id="encryptRequest"></pre>
             <h3>Encrypted Value</h3>
             <pre id="encryptedValue"></pre>
 
-            <h3>Sample Decryption Request - POST /decrypt</h3>
+            <h3>Sample Decryption Request</h3>
             <pre id="decryptRequest"></pre>
             <h3>Decrypted Value</h3>
             <pre id="decryptedValue"></pre>
@@ -173,11 +180,21 @@
         <!-- Hashing Section -->
         <div class="section">
             <h2>Hashing</h2>
+            <label for="hash-algorithm">Hash Algorithm:</label>
+            <select id="hash-algorithm">
+                <option value="SHA-256">SHA-256</option>
+                <option value="SHA-512">SHA-512</option>
+                <option value="SHA3-256">SHA3-256</option>
+                <option value="SHA3-512">SHA3-512</option>
+                <option value="BLAKE2b">BLAKE2b</option>
+                <option value="BLAKE2s">BLAKE2s</option>
+            </select>
+
             <label for="hash-data">Enter Data to Hash:</label>
             <input type="text" id="hash-data" placeholder="Enter data">
             <button onclick="generateHash()">Generate Hash</button>
 
-            <h3>Sample Hash Generation Request - POST /generate-hash</h3>
+            <h3>Sample Hash Generation Request</h3>
             <pre id="hashRequest"></pre>
             <h3>Generated Hash</h3>
             <pre id="hashValue"></pre>
@@ -189,7 +206,7 @@
             <input type="text" id="hash-value" placeholder="Enter hash value">
             <button onclick="verifyHash()">Verify Hash</button>
 
-            <h3>Sample Hash Verification Request - POST /verify-hash </h3>
+            <h3>Sample Hash Verification Request</h3>
             <pre id="hashVerifyRequest"></pre>
             <h3>Hash Verification Result</h3>
             <pre id="hashVerification"></pre>
