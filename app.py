@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 import base64
 import os
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -11,9 +11,8 @@ from cryptography.hazmat.backends import default_backend
 
 app = Flask(__name__)
 
-
 keys = {}
-
+users = {}
 
 def generate_aes_key(key_size):
     """Generates a random AES key."""
@@ -36,7 +35,7 @@ def serialize_rsa_private_key(private_key):
     pem = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption()  # No password for simplicity 
+        encryption_algorithm=serialization.NoEncryption()  # No password for simplicity
     )
     return pem
 
@@ -157,6 +156,20 @@ def verify_hash(data, hash_value, algorithm):
         return False, "An error occurred during hash verification"
 
 
+#---------password chain-------------
+def hash_function(data):
+    """Returns a SHA-256 hash of the input data."""
+    return hashlib.sha256(data.encode()).hexdigest()
+
+def generate_hash_chain(password, n):
+    """Generates the full hash chain and returns Hⁿ(p)."""
+    hashes = [password]
+    for _ in range(n):
+        hashes.append(hash_function(hashes[-1]))
+    print(hashes[-1])
+    return hashes[::-1]  # Reverse to maintain order
+#-------------------------------------
+
 
 @app.route('/generate-key', methods=['POST'])
 def generate_key():
@@ -270,7 +283,7 @@ def generate_hash_endpoint():
 
     try:
         hash_value, used_algorithm = generate_hash(input_data, algorithm)
-        return jsonify({'hash_value': hash_value, 'algorithm': used_algorithm}), 201
+        return jsonify({'hash_value': hash_value, 'algorithm': used_algorithm}), 200
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     except Exception as e:
@@ -293,6 +306,60 @@ def verify_hash_endpoint():
       return jsonify({'is_valid': is_valid, 'message': message}), 200
     except Exception as e:
        return jsonify({"error":"An unexpected error occurred: "+str(e)}),500
+    
+@app.route('/')
+def index():
+    return render_template('index.html')
 
-# if __name__ == '__main__':
-#     app.run(debug=True)  # Use debug=True for development only 
+@app.route("/test_password_hash", methods=["POST"])
+def test_password_hash():
+    """Generates the hash of a given password n times."""
+    data = request.get_json()
+    password = data.get("password")
+    n = data.get("n", 100)
+    if not password:
+        return jsonify({"error": "Missing password"}), 400
+    hash_chain = generate_hash_chain(password, n)
+    return jsonify({"hash_n": hash_chain[0]}), 200
+
+
+@app.route("/register", methods=["POST"])
+def register():
+    """Registers a user by storing the last hash of a hash chain."""
+    data = request.get_json()
+    username = data.get("username")
+    password = data.get("password")
+    n = data.get("n", 100)  # Default hash chain length 100
+
+    if not username or not password:
+        return jsonify({"error": "Missing username or password"}), 400
+
+    hash_chain = generate_hash_chain(password, n)
+    users[username] = {"hash": hash_chain[0], "j": n}
+
+    return jsonify({"message": "User registered successfully", "n": n}), 201
+
+@app.route("/authenticate", methods=["POST"])
+def authenticate():
+    """Authenticates a user using the Lamport hash chain scheme."""
+    data = request.get_json()
+    username = data.get("username")
+    password_hash = data.get("password_hash")
+
+    if username not in users:
+        return jsonify({"error": "User not found"}), 404
+
+    user_data = users[username]
+    expected_hash = user_data["hash"]
+
+    if hash_function(password_hash) == expected_hash:
+        users[username]["hash"] = password_hash  # Update stored hash
+        users[username]["j"] -= 1  # Reduce the index
+        if users[username]["j"] == 0:
+            del users[username]  # Expire user after n authentications
+        return jsonify({"message": "Authentication successful"}), 200
+    else:
+        return jsonify({"error": "Invalid credentials"}), 401
+
+if __name__ == '__main__':
+    app.run(debug=True)  # Use debug=True for development only 

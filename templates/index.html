@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Documentation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #222;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            background: #ffffff;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+        }
+        button {
+            background: #007BFF;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        select, input {
+            padding: 8px;
+            width: 100%;
+            margin-top: 5px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        pre {
+            background: #eee;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+    <script>
+        async function testAPI(endpoint, method, body = null, requestId, outputId) {
+            const url = `https://cyber-proj-milestone-2.onrender.com/${endpoint}`;
+            const options = {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+            };
+            if (body) {
+                options.body = JSON.stringify(body);
+                document.getElementById(requestId).innerText = JSON.stringify(body, null, 2);
+            }
+            
+            const response = await fetch(url, options);
+            const result = await response.json();
+            document.getElementById(outputId).innerText = JSON.stringify(result, null, 2);
+            return result;
+        }
+
+        async function handleEncryption() {
+            const plaintext = document.getElementById("plaintext").value;
+            const keyType = document.getElementById("key-type").value;
+            const keySize = parseInt(document.getElementById("key-size").value);
+            
+            // Generate Key
+            const keyResponse = await testAPI(
+                'generate-key', 
+                'POST', 
+                { key_type: keyType, key_size: keySize }, 
+                "keyRequest", "generatedKey"
+            );
+            const keyId = keyResponse.key_id;
+            
+            // Encrypt Data
+            const encryptionResponse = await testAPI(
+                'encrypt', 
+                'POST', 
+                { key_id: keyId, plaintext: plaintext, algorithm: keyType }, 
+                "encryptRequest", "encryptedValue"
+            );
+            const ciphertext = encryptionResponse.ciphertext;
+            
+            // Decrypt Data
+            await testAPI(
+                'decrypt', 
+                'POST', 
+                { key_id: keyId, ciphertext: ciphertext, algorithm: keyType }, 
+                "decryptRequest", "decryptedValue"
+            );
+        }
+
+        async function generateHash() {
+            const data = document.getElementById("hash-data").value;
+            await testAPI(
+                'generate-hash', 
+                'POST', 
+                { data: data, algorithm: 'SHA-256' }, 
+                "hashRequest", "hashValue"
+            );
+        }
+
+        async function verifyHash() {
+            const data = document.getElementById("hash-data").value;
+            const hashValue = document.getElementById("hash-value").value;
+            await testAPI(
+                'verify-hash', 
+                'POST', 
+                { data: data, hash_value: hashValue, algorithm: 'SHA-256' }, 
+                "hashVerifyRequest", "hashVerification"
+            );
+        }
+    </script>
+</head>
+<body>
+    <h1>Cryptographic API Interactive Documentation - Team CyberBoys</h1>
+    <div class="container">
+
+        <!-- Encryption Section -->
+        <div class="section">
+            <h2>Encryption Workflow</h2>
+            <label for="key-type">Key Type:</label>
+            <select id="key-type">
+                <option value="AES">AES</option>
+                <option value="RSA">RSA</option>
+            </select>
+
+            <label for="key-size">Key Size:</label>
+            <select id="key-size">
+                <option value="128">128</option>
+                <option value="192">192</option>
+                <option value="256">256</option>
+                <option value="1024">1024</option>
+                <option value="2048">2048</option>
+            </select>
+
+            <h3>Enter Text to Encrypt</h3>
+            <input type="text" id="plaintext" placeholder="Enter text here">
+            <button onclick="handleEncryption()">Generate Key & Encrypt</button>
+
+            <h3>Sample Key Generation Request - POST /generate-key</h3>
+            <pre id="keyRequest"></pre>
+            <h3>Generated Key</h3>
+            <pre id="generatedKey"></pre>
+
+            <h3>Sample Encryption Request - POST /encrypt</h3>
+            <pre id="encryptRequest"></pre>
+            <h3>Encrypted Value</h3>
+            <pre id="encryptedValue"></pre>
+
+            <h3>Sample Decryption Request - POST /decrypt</h3>
+            <pre id="decryptRequest"></pre>
+            <h3>Decrypted Value</h3>
+            <pre id="decryptedValue"></pre>
+        </div>
+
+        <!-- Hashing Section -->
+        <div class="section">
+            <h2>Hashing</h2>
+            <label for="hash-data">Enter Data to Hash:</label>
+            <input type="text" id="hash-data" placeholder="Enter data">
+            <button onclick="generateHash()">Generate Hash</button>
+
+            <h3>Sample Hash Generation Request - POST /generate-hash</h3>
+            <pre id="hashRequest"></pre>
+            <h3>Generated Hash</h3>
+            <pre id="hashValue"></pre>
+        </div>
+
+        <div class="section">
+            <h2>Verify Hash</h2>
+            <label for="hash-value">Enter Hash to Verify:</label>
+            <input type="text" id="hash-value" placeholder="Enter hash value">
+            <button onclick="verifyHash()">Verify Hash</button>
+
+            <h3>Sample Hash Verification Request - POST /verify-hash </h3>
+            <pre id="hashVerifyRequest"></pre>
+            <h3>Hash Verification Result</h3>
+            <pre id="hashVerification"></pre>
+        </div>
+    </div>
+</body>
+</html>
